@@ -14,18 +14,13 @@ concurrency:
 
 jobs:
   build:
-    runs-on: macos-15-intel
+    runs-on: macos-26
     timeout-minutes: 360
     steps:
       - name: Free disk space
         run: |
           df -h /
-          WANT=$(curl -sL "https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${GITHUB_SHA}/versions.json" | python3 -c 'import json,sys;print(json.load(sys.stdin)["xcode"])')
-          for app in /Applications/Xcode_*.app; do
-            b=$(basename "$app")
-            case "$b" in "Xcode_${WANT}.app"|"Xcode_${WANT}.0.app") ;; *) sudo rm -rf "$app" || true ;; esac
-          done
-          sudo rm -rf /Users/runner/Library/Android /usr/local/share/dotnet || true
+          sudo rm -rf /Users/runner/Library/Android /usr/local/share/dotnet /usr/local/lib/android || true
           df -h /
 
       - uses: actions/checkout@v4
@@ -36,12 +31,15 @@ jobs:
       - name: Select Xcode
         run: |
           XV=$(python3 -c 'import json;print(json.load(open("versions.json"))["xcode"])')
+          ls -d /Applications/Xcode*.app || true
           if [ -d "/Applications/Xcode_${XV}.app" ]; then
-            sudo xcode-select -s "/Applications/Xcode_${XV}.app/Contents/Developer"; echo "OVERRIDE_XCODE_FLAG=" >> $GITHUB_ENV
+            PICK="/Applications/Xcode_${XV}.app"; echo "OVERRIDE_XCODE_FLAG=" >> $GITHUB_ENV
           else
-            ls /Applications | grep Xcode || true
+            PICK=$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)
             echo "OVERRIDE_XCODE_FLAG=--overrideXcodeVersion" >> $GITHUB_ENV
           fi
+          echo "Using $PICK (wanted $XV)"
+          sudo xcode-select -s "$PICK/Contents/Developer"
           xcodebuild -version
 
       - name: Canonical source directory
