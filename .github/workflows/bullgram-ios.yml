@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   build:
-    runs-on: macos-26
+    runs-on: macos-26-intel  # Apple-silicon runners are not being assigned to this account
     timeout-minutes: 360
     steps:
       - name: Free disk space
