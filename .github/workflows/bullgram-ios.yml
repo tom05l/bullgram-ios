@@ -28,6 +28,15 @@ jobs:
           submodules: recursive
           fetch-depth: 1
 
+      - name: Bazel for this host's architecture
+        run: |
+          # versions.json pins the arm64 binary's hash; Intel runners need the x86_64 one
+          # (official bazel-9.2.0-darwin-x86_64.sha256).
+          if [ "$(uname -m)" = "x86_64" ]; then
+            sed -i '' 's/dd466352a3e4d3581b8898740ee1ff208866ccbe25f8d367c5dcb950219587e6/14c9bcb01303b38192e0e2895051c1bcf19bf89d7e416f5aeeeb48b6b624cfbf/' versions.json
+          fi
+          cat versions.json
+
       - name: Select Xcode
         run: |
           XV=$(python3 -c 'import json;print(json.load(open("versions.json"))["xcode"])')
