@@ -34,6 +34,11 @@ jobs:
           # (official bazel-9.2.0-darwin-x86_64.sha256).
           if [ "$(uname -m)" = "x86_64" ]; then
             sed -i '' 's/dd466352a3e4d3581b8898740ee1ff208866ccbe25f8d367c5dcb950219587e6/14c9bcb01303b38192e0e2895051c1bcf19bf89d7e416f5aeeeb48b6b624cfbf/' versions.json
+            # wasi-sdk is pinned to the arm64 macOS build ("Bad CPU type" on Intel): the x86_64 one,
+            # sha256 of the official wasi-sdk-33.0-x86_64-macos.tar.gz.
+            sed -i '' -e 's/wasi-sdk-33.0-arm64-macos/wasi-sdk-33.0-x86_64-macos/g' \
+              -e 's/85c997a2665ead91673b5bb88b7d0df3fc8900df3bfa244f720d478187bbdc78/18f3f201ba9734e6a4455b0b6410690395a55e9ffa9f6f5066f66083a94b93b3/' MODULE.bazel
+            grep -n 'wasi-sdk-33.0-.*-macos' MODULE.bazel
           fi
           cat versions.json
 
