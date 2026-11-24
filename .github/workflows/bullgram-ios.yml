@@ -39,6 +39,11 @@ jobs:
             sed -i '' -e 's/wasi-sdk-33.0-arm64-macos/wasi-sdk-33.0-x86_64-macos/g' \
               -e 's/85c997a2665ead91673b5bb88b7d0df3fc8900df3bfa244f720d478187bbdc78/18f3f201ba9734e6a4455b0b6410690395a55e9ffa9f6f5066f66083a94b93b3/' MODULE.bazel
             grep -n 'wasi-sdk-33.0-.*-macos' MODULE.bazel
+            # Xcode 26 SDK: no UIView.reservedRegions (iOS 27.1, iPhone Duo only). Use what the code
+            # already returns on older iOS.
+            perl -0pi -e 's/return view\.reservedRegions\(kind: \.occlusion\)\.filter\(\\\.isActive\)\.map\(\\\.frame\)/return []/' submodules/Display/Source/ReservedArea.swift
+            perl -0pi -e 's/return self\.eventView\.reservedRegions\(kind: \.division\)\.first\(where: \\\.isActive\)\?\.frame/return nil/' submodules/Display/Source/WindowContent.swift
+            ! grep -rn 'reservedRegions(' submodules/Display/Source
           fi
           cat versions.json
 
@@ -79,6 +84,7 @@ jobs:
             --configurationPath=build-system/bullgram-configuration.json \
             --codesigningInformationPath=build-system/fake-codesigning \
             --configuration=release_arm64 \
+            --continueOnError \
             --buildNumber="$BUILD_NUMBER" \
             --outputBuildArtifactsPath=/Users/Shared/telegram-ios/build/artifacts
           ls -lh build/artifacts
