@@ -1,0 +1,88 @@
+name: Bullgram iOS (unsigned IPA)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [bullgram]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-26
+    timeout-minutes: 360
+    steps:
+      - name: Free disk space
+        run: |
+          df -h /
+          WANT=$(curl -sL "https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${GITHUB_SHA}/versions.json" | python3 -c 'import json,sys;print(json.load(sys.stdin)["xcode"])')
+          for app in /Applications/Xcode_*.app; do
+            b=$(basename "$app")
+            case "$b" in "Xcode_${WANT}.app"|"Xcode_${WANT}.0.app") ;; *) sudo rm -rf "$app" || true ;; esac
+          done
+          sudo rm -rf /Users/runner/Library/Android /usr/local/share/dotnet || true
+          df -h /
+
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 1
+
+      - name: Select Xcode
+        run: |
+          XV=$(python3 -c 'import json;print(json.load(open("versions.json"))["xcode"])')
+          if [ -d "/Applications/Xcode_${XV}.app" ]; then
+            sudo xcode-select -s "/Applications/Xcode_${XV}.app/Contents/Developer"; echo "OVERRIDE_XCODE_FLAG=" >> $GITHUB_ENV
+          else
+            ls /Applications | grep Xcode || true
+            echo "OVERRIDE_XCODE_FLAG=--overrideXcodeVersion" >> $GITHUB_ENV
+          fi
+          xcodebuild -version
+
+      - name: Canonical source directory
+        run: |
+          sudo mkdir -p /Users/Shared && sudo rm -rf /Users/Shared/telegram-ios
+          sudo chown "$(whoami)" /Users/Shared
+          mv "$GITHUB_WORKSPACE" /Users/Shared/telegram-ios && mkdir -p "$GITHUB_WORKSPACE"
+
+      - name: Build
+        run: |
+          set -eux
+          cd /Users/Shared/telegram-ios
+          APP_VERSION=$(python3 -c 'import json;print(json.load(open("versions.json"))["app"])')
+          BUILD_NUMBER=$(( $(cat build_number_offset | tr -d '[:space:]') + GITHUB_RUN_NUMBER ))
+          echo "APP_VERSION=$APP_VERSION" >> $GITHUB_ENV
+          echo "BUILD_NUMBER=$BUILD_NUMBER" >> $GITHUB_ENV
+          python3 build-system/Make/ImportCertificates.py --path build-system/fake-codesigning/certs
+          python3 build-system/Make/RefreshFakeProfiles.py com.usa8.messenger
+          python3 -u build-system/Make/Make.py \
+            --bazelUserRoot=/private/var/tmp/_bazel_containerhost \
+            $OVERRIDE_XCODE_FLAG \
+            build \
+            --configurationPath=build-system/bullgram-configuration.json \
+            --codesigningInformationPath=build-system/fake-codesigning \
+            --configuration=release_arm64 \
+            --buildNumber="$BUILD_NUMBER" \
+            --outputBuildArtifactsPath=/Users/Shared/telegram-ios/build/artifacts
+          ls -lh build/artifacts
+          cp build/artifacts/Telegram.ipa "build/artifacts/Bullgram-${APP_VERSION}-${BUILD_NUMBER}-unsigned.ipa"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Bullgram-iOS-${{ env.APP_VERSION }}-${{ env.BUILD_NUMBER }}
+          path: /Users/Shared/telegram-ios/build/artifacts/Bullgram-*.ipa
+          retention-days: 30
+
+      - name: Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "build-${BUILD_NUMBER}" /Users/Shared/telegram-ios/build/artifacts/Bullgram-*.ipa \
+            --repo "$GITHUB_REPOSITORY" --prerelease \
+            --title "Bullgram iOS ${APP_VERSION} (${BUILD_NUMBER}) unsigned" \
+            --notes "Unsigned IPA (sign with ESign / Sideloadly / AltStore). Server 141.98.7.179:42000. No push notifications without an Apple certificate."
