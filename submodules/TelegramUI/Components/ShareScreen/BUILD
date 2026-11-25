@@ -10,6 +10,8 @@ swift_library(
     ]),
     copts = [
         "-warnings-as-errors",
+        # Xcode 26.6 Swift trips its own OSSA lifetime check on ShareScreen.init
+        "-Xfrontend", "-disable-sil-ownership-verifier",
     ],
     deps = [
         "//submodules/AsyncDisplayKit",

@@ -341,14 +341,7 @@ public final class ShareScreen: ViewControllerComponentContainer {
         self.collectibleItemInfo = collectibleItemInfo
         self.forcedActionTitle = forcedActionTitle
         self.shareStory = shareStory
-        var preferredAction = preferredAction
-        if case .default = preferredAction, let showInChat, case let .messages(messages) = subject, messages.count == 1, let message = messages.first {
-            let title = (updatedPresentationData?.initial ?? context.sharedContext.currentPresentationData.with { $0 }).strings.SharedMedia_ViewInChat
-            preferredAction = .custom(action: ShareControllerAction(title: title, action: {
-                showInChat(message)
-            }))
-        }
-        self.preferredAction = preferredAction
+        self.preferredAction = ShareScreen.resolvePreferredAction(preferredAction, subject: subject, showInChat: showInChat, context: context, presentationData: updatedPresentationData?.initial)
         self.externalShareSubject = externalShareSubject
         self.shareAsLink = shareAsLink
         self.model = ShareScreenState(context: context)
@@ -373,6 +366,17 @@ public final class ShareScreen: ViewControllerComponentContainer {
             }))
         }
         self.configureCopy()
+    }
+
+    // Kept out of init: Xcode 26.6's Swift leaks a value in OSSA when this capture lives in the initializer.
+    private static func resolvePreferredAction(_ preferredAction: ShareControllerPreferredAction, subject: Subject, showInChat: ((EngineRawMessage) -> Void)?, context: AccountContext, presentationData: PresentationData?) -> ShareControllerPreferredAction {
+        guard case .default = preferredAction, let showInChat, case let .messages(messages) = subject, messages.count == 1, let message = messages.first else {
+            return preferredAction
+        }
+        let title = (presentationData ?? context.sharedContext.currentPresentationData.with { $0 }).strings.SharedMedia_ViewInChat
+        return .custom(action: ShareControllerAction(title: title, action: {
+            showInChat(message)
+        }))
     }
 
     private func configureCopy() {
