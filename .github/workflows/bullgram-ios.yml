@@ -60,6 +60,9 @@ jobs:
           echo "Using $PICK (wanted $XV)"
           sudo xcode-select -s "$PICK/Contents/Developer"
           xcodebuild -version
+          # Xcode 26 ships the Metal compiler separately (shaders: DustEffect, WalletSendAmount …).
+          xcrun -f metal >/dev/null 2>&1 || sudo xcodebuild -downloadComponent MetalToolchain
+          xcrun -f metal
 
       - name: Canonical source directory
         run: |
